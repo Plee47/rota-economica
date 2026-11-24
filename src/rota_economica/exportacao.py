@@ -71,24 +71,34 @@ def main(argv: list[str] | None = None) -> int:
     spark = SparkSession.builder.getOrCreate()
     args.destino.mkdir(parents=True, exist_ok=True)
 
-    def tabela(nome: str) -> pd.DataFrame:
-        return spark.table(f"{args.esquema}.{nome}").toPandas()
+    def tabela(nome: str) -> pd.DataFrame | None:
+        completo = f"{args.esquema}.{nome}"
+        if not spark.catalog.tableExists(completo):
+            log.warning("%s não existe: o arquivo dela fica de fora desta exportação", completo)
+            return None
+        return spark.table(completo).toPandas()
 
-    recortar_municipios(tabela("gold_diesel_semanal_municipio")).to_parquet(
-        args.destino / "precos_municipio.parquet", index=False
-    )
-    tabela("gold_diesel_semanal_uf").to_parquet(args.destino / "precos_uf.parquet", index=False)
+    # Cada arquivo é independente: o que faltar não impede os outros (o site funciona sem eles).
+    gold_municipio = tabela("gold_diesel_semanal_municipio")
+    if gold_municipio is not None:
+        recortar_municipios(gold_municipio).to_parquet(
+            args.destino / "precos_municipio.parquet", index=False
+        )
+    gold_uf = tabela("gold_diesel_semanal_uf")
+    if gold_uf is not None:
+        gold_uf.to_parquet(args.destino / "precos_uf.parquet", index=False)
     previsoes = tabela("previsoes_diesel")
-    ultima = previsoes["semana_origem"].max()
-    previsoes[previsoes["semana_origem"] == ultima].to_parquet(
-        args.destino / "previsoes.parquet", index=False
-    )
-    cache = args.bruto / "ibge"
-    municipios.carregar(ClienteHTTP(), cache).to_parquet(
+    if previsoes is not None and not previsoes.empty:
+        ultima = previsoes["semana_origem"].max()
+        previsoes[previsoes["semana_origem"] == ultima].to_parquet(
+            args.destino / "previsoes.parquet", index=False
+        )
+    municipios.carregar(ClienteHTTP(), args.bruto / "ibge").to_parquet(
         args.destino / "municipios.parquet", index=False
     )
-    csv = (args.bruto / "antt" / "praca-de-pedagio.csv").read_bytes()
-    pracas_de_pedagio(csv).to_parquet(args.destino / "pracas.parquet", index=False)
+    csv = args.bruto / "antt" / "praca-de-pedagio.csv"
+    if csv.exists():
+        pracas_de_pedagio(csv.read_bytes()).to_parquet(args.destino / "pracas.parquet", index=False)
     # modelo.json é gravado pelo job da previsão, que tem as métricas.
     for nome in ARQUIVOS:
         caminho = args.destino / nome
