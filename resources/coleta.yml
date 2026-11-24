@@ -1,0 +1,40 @@
+resources:
+  schemas:
+    rota:
+      catalog_name: ${var.catalogo}
+      name: ${var.schema}
+      comment: "Rota Econômica: preços de diesel, pedágios, previsões e monitoramento"
+
+  volumes:
+    bruto:
+      catalog_name: ${var.catalogo}
+      schema_name: ${resources.schemas.rota.name}
+      name: bruto
+      comment: "Arquivos da ANP e da ANTT como vieram da fonte (camada bronze em arquivo)"
+
+  jobs:
+    coleta_semanal:
+      name: "Rota Econômica · coleta semanal"
+      # A ANP publica a semana na segunda-feira; a coleta roda na terça de manhã.
+      schedule:
+        quartz_cron_expression: "0 0 9 ? * TUE"
+        timezone_id: America/Sao_Paulo
+        pause_status: UNPAUSED
+      max_concurrent_runs: 1
+      tasks:
+        - task_key: coletar
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-coleta
+            parameters:
+              - "--destino"
+              - "/Volumes/${var.catalogo}/${var.schema}/bruto"
+          max_retries: 2
+          min_retry_interval_millis: 600000
+      environments:
+        - environment_key: padrao
+          spec:
+            client: "2"
+            dependencies:
+              - ../dist/*.whl

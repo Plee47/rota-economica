@@ -1,0 +1,25 @@
+# Bundle do Databricks: o mesmo pacote Python dos testes vira um wheel e roda no job semanal.
+bundle:
+  name: rota-economica
+
+artifacts:
+  pacote:
+    type: whl
+    path: .
+    build: python -m pip wheel --no-deps -w dist .
+
+variables:
+  catalogo:
+    default: workspace
+  schema:
+    default: rota_economica
+
+include:
+  - resources/*.yml
+
+targets:
+  dev:
+    mode: development
+    default: true
+  prod:
+    mode: production
