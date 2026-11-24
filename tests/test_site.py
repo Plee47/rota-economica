@@ -9,7 +9,7 @@ import pytest
 pytest.importorskip("streamlit")
 from streamlit.testing.v1 import AppTest  # noqa: E402
 
-from rota_economica.rota.provedor import OSRM, ComCache, Rota  # noqa: E402
+from rota_economica.rota.provedor import Rota, provedor_padrao  # noqa: E402
 
 APP = str(Path(__file__).parents[1] / "app" / "streamlit_app.py")
 SP, BA = ("1", "São Paulo", "SP", "SAO PAULO", 0.0, -10.0), ("9", "Salvador", "BA", "SALVADOR",
@@ -54,7 +54,7 @@ def site(tmp_path, monkeypatch):
     }))  # fmt: skip
     # Rota de SP a Salvador já em cache: o OSRM não é chamado.
     pontos = [(SP[4], SP[5]), (BA[4], BA[5])]
-    arquivo = ComCache(OSRM(None), cache)._arquivo(pontos)
+    arquivo = provedor_padrao(None, cache)._arquivo(pontos)
     arquivo.parent.mkdir(parents=True)
     rota = Rota(890.0, 11.0, [(float(x), -10.0) for x in range(0, 9)], "osrm")
     arquivo.write_text(json.dumps({"distancia_km": rota.distancia_km, "duracao_h": rota.duracao_h,
@@ -64,16 +64,20 @@ def site(tmp_path, monkeypatch):
     return AppTest.from_file(APP, default_timeout=60)
 
 
+def _html(at) -> str:
+    return " ".join(h.proto.body for h in at.get("html"))
+
+
 def test_calcula_a_viagem(site):
     at = site.run()
     assert not at.exception
     at.sidebar.button[0].click().run()
     assert not at.exception, at.exception
-    metricas = {m.label: m.value for m in at.metric}
-    assert metricas["Distância"] == "890 km"
-    assert metricas["Pedágio estimado"].startswith("R$")
-    assert any("economiza" in s.value for s in at.success)
-    assert len(at.dataframe) >= 1  # tabela de paradas
+    pagina = _html(at)
+    assert "São Paulo" in pagina and "Salvador" in pagina
+    assert "890 km" in pagina and "Pedágio estimado" in pagina and "Total" in pagina
+    assert 'class="economia"' in pagina
+    assert 'class="paradas"' in pagina
 
 
 def test_abas_de_preco_e_modelo(site):
@@ -82,6 +86,25 @@ def test_abas_de_preco_e_modelo(site):
     textos = " ".join(m.value for m in at.markdown)
     assert "gradiente v3" in textos
     assert any("dentro do esperado" in s.value for s in at.success)
+
+
+def test_exemplo_na_primeira_visita(site):
+    at = site.run()
+    exemplo = [b for b in at.button if "exemplo" in b.label.lower()]
+    assert exemplo
+    exemplo[0].click().run()
+    assert not at.exception
+    assert 'class="nota"' in _html(at)
+
+
+def test_caminhao_impossivel_explica(site):
+    at = site.run()
+    campos = {n.label: n for n in at.sidebar.number_input}
+    campos["Tanque (L)"].set_value(400).run()
+    campos = {n.label: n for n in at.sidebar.number_input}
+    campos["Reserva mínima (L)"].set_value(450).run()  # maior que o tanque
+    at.sidebar.button[0].click().run()
+    assert any("reserva mínima" in w.value for w in at.warning)
 
 
 def test_sem_dados_explica_como_sincronizar(tmp_path, monkeypatch):

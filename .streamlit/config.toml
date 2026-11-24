@@ -1,0 +1,55 @@
+# Identidade visual: estrada brasileira, de dia.
+# Tinta cor de asfalto sobre branco levemente esverdeado, o verde das placas de rodovia federal
+# nas ações e o âmbar das placas de advertência só para avisos e pedágio. Barlow, uma família
+# desenhada a partir de placas de rodovia: condensada nos títulos, regular no texto.
+
+[client]
+toolbarMode = "minimal"
+
+[theme]
+base = "light"
+primaryColor = "#0E6B45"
+backgroundColor = "#F3F5F4"
+secondaryBackgroundColor = "#E6EBE8"
+textColor = "#18211D"
+linkColor = "#0E6B45"
+linkUnderline = true
+borderColor = "#C9D2CD"
+showWidgetBorder = true
+showSidebarBorder = true
+baseRadius = "0.375rem"
+buttonRadius = "0.375rem"
+baseFontSize = 16
+font = "Barlow:https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap"
+headingFont = "Barlow Semi Condensed:https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@500;600;700&display=swap"
+headingFontWeights = [700, 600, 600, 600, 600, 600]
+codeFont = "JetBrains Mono:https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap"
+codeBackgroundColor = "#E6EBE8"
+metricValueFontWeight = 600
+dataframeHeaderBackgroundColor = "#E6EBE8"
+dataframeBorderColor = "#C9D2CD"
+chartCategoricalColors = ["#0E6B45", "#C2410C", "#2F6690", "#8A6A12", "#5C6B64"]
+
+greenColor = "#0E6B45"
+greenTextColor = "#0B5536"
+greenBackgroundColor = "#DCEFE5"
+orangeColor = "#B45309"
+orangeTextColor = "#7A3807"
+orangeBackgroundColor = "#FBEBD3"
+redColor = "#B42318"
+redTextColor = "#8A1C13"
+redBackgroundColor = "#FBE3E0"
+blueColor = "#2F6690"
+blueTextColor = "#1F4A6B"
+blueBackgroundColor = "#E1ECF5"
+yellowColor = "#A16207"
+yellowTextColor = "#6E4305"
+yellowBackgroundColor = "#FCF0CF"
+grayColor = "#5C6B64"
+grayTextColor = "#3F4B46"
+grayBackgroundColor = "#E6EBE8"
+
+[theme.sidebar]
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F3F5F4"
+borderColor = "#C9D2CD"

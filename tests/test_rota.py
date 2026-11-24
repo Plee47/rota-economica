@@ -127,3 +127,29 @@ def test_municipios_no_caminho_em_ordem_e_dentro_do_raio():
     r = trajeto.municipios_no_caminho(rota, m)
     assert list(r["nome"]) == ["A", "C"]
     assert r["km"].is_monotonic_increasing and (r["desvio_km"] <= trajeto.RAIO_KM).all()
+
+
+def test_encadeado_usa_a_reserva_quando_o_primeiro_cai():
+    from rota_economica.http import ErroHTTP
+    from rota_economica.rota.provedor import FOSSGIS, Encadeado
+
+    class Caido:
+        def json(self, url):
+            raise ErroHTTP("router.project-osrm.org: HTTP 503")
+
+    reserva = ClienteRota(RESPOSTA)
+    r = Encadeado([OSRM(Caido()), OSRM(reserva, base=FOSSGIS)]).rota([SP, RJ])
+    assert r.distancia_km == pytest.approx(433.6)
+    assert reserva.urls[0].startswith(FOSSGIS)
+
+
+def test_encadeado_explica_quando_todos_caem():
+    from rota_economica.http import ErroHTTP
+    from rota_economica.rota.provedor import Encadeado
+
+    class Caido:
+        def json(self, url):
+            raise ErroHTTP("fora do ar")
+
+    with pytest.raises(ErroHTTP, match="nenhum serviço de rotas respondeu"):
+        Encadeado([OSRM(Caido()), OSRM(Caido())]).rota([SP, RJ])

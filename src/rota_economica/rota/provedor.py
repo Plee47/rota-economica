@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Protocol
 
 from rota_economica.coleta.anp import ErroFormato
-from rota_economica.http import ClienteHTTP
+from rota_economica.http import ClienteHTTP, ErroHTTP
 from rota_economica.rota.geo import Ponto
 
 
@@ -52,6 +52,30 @@ class OSRM:
         r = dados["routes"][0]
         trajeto = [(float(x), float(y)) for x, y in r["geometry"]["coordinates"]]
         return Rota(r["distance"] / 1000, r["duration"] / 3600, trajeto, "osrm")
+
+
+FOSSGIS = "https://routing.openstreetmap.de/routed-car"  # segundo servidor público, mesma API
+
+
+@dataclass
+class Encadeado:
+    """Tenta cada provedor na ordem: se um servidor público cair, o seguinte responde."""
+
+    provedores: list[ProvedorRota]
+
+    def rota(self, pontos: list[Ponto]) -> Rota:
+        erros = []
+        for p in self.provedores:
+            try:
+                return p.rota(pontos)
+            except (ErroHTTP, ErroFormato) as e:
+                erros.append(f"{type(p).__name__}: {e}")
+        raise ErroHTTP("nenhum serviço de rotas respondeu (" + "; ".join(erros) + ")")
+
+
+def provedor_padrao(cliente: ClienteHTTP, cache: Path) -> ComCache:
+    """OSRM público, com o servidor da FOSSGIS como reserva, e cache em disco."""
+    return ComCache(Encadeado([OSRM(cliente), OSRM(cliente, base=FOSSGIS)]), cache)
 
 
 @dataclass
