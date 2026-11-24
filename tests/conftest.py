@@ -53,7 +53,7 @@ class ClienteFalso:
         conteudo = f"{url}|{self.versoes.get(url, 'v1')}".encode()
         destino.parent.mkdir(parents=True, exist_ok=True)
         destino.write_bytes(conteudo)
-        return Download(destino, len(conteudo), hashlib.sha256(conteudo).hexdigest())
+        return Download(destino, len(conteudo), hashlib.sha256(conteudo).hexdigest(), len(conteudo))
 
 
 @pytest.fixture
