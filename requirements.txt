@@ -1,0 +1,6 @@
+# Dependências do site no Streamlit Community Cloud (o app importa o pacote de src/).
+streamlit>=1.50
+pydeck>=0.9
+pandas>=2.0
+pyarrow>=14
+requests>=2.31
