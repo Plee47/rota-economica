@@ -29,7 +29,7 @@ resources:
             entry_point: rota-coleta
             parameters:
               - "--destino"
-              - "/Volumes/${var.catalogo}/${var.schema}/bruto"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
           max_retries: 2
           min_retry_interval_millis: 600000
       environments:
