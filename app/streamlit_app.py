@@ -38,6 +38,10 @@ DADOS = Path(os.environ.get("ROTA_DADOS", RAIZ / "dados" / "site"))
 CACHE_ROTAS = Path(os.environ.get("ROTA_CACHE", Path(tempfile.gettempdir()) / "rota-economica"))
 TIPOS = {"S10": "Diesel S10", "comum": "Diesel comum (S500)"}
 DIAS_DADOS_VELHOS = 14
+# Eixos dos gráficos em português: meses abreviados e vírgula decimal (o Vega usa inglês e ponto).
+MESES = "['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez']"
+EIXO_DATA = alt.Axis(title=None, labelExpr=f"{MESES}[month(datum.value)] + ' ' + year(datum.value)")
+EIXO_REAIS = alt.Axis(title="R$/L", labelExpr="replace(format(datum.value, '.2f'), '.', ',')")
 EXEMPLO = {"origem": ("SP", "São Paulo"), "destino": ("BA", "Salvador")}
 
 st.set_page_config(
@@ -57,12 +61,19 @@ def carregar(pasta: str, versao: float) -> dict:
         return {"faltam": faltam}
 
     def opcional(nome: str):
+        """Um arquivo que falta ou não abre só desliga a parte que depende dele."""
         caminho = base / nome
         if not caminho.exists():
             return None
-        if nome.endswith(".json"):
-            return json.loads(caminho.read_text(encoding="utf-8"))
-        return pd.read_parquet(caminho)
+        try:
+            if nome.endswith(".json"):
+                return json.loads(caminho.read_text(encoding="utf-8"))
+            return pd.read_parquet(caminho)
+        except (OSError, ValueError) as erro:  # ValueError cobre JSON e Parquet inválidos
+            ilegiveis.append(f"{nome} ({type(erro).__name__})")
+            return None
+
+    ilegiveis: list[str] = []
 
     return {
         "municipio": pd.read_parquet(base / "precos_municipio.parquet"),
@@ -71,6 +82,7 @@ def carregar(pasta: str, versao: float) -> dict:
         "uf": opcional("precos_uf.parquet"),
         "previsoes": opcional("previsoes.parquet"),
         "modelo": opcional("modelo.json"),
+        "ilegiveis": ilegiveis,
     }
 
 
@@ -117,22 +129,31 @@ if dias > DIAS_DADOS_VELHOS:
         "pode ter falhado: os valores servem de referência, não de cotação."
     )
 
+if dados["ilegiveis"]:
+    st.warning(
+        "Alguns arquivos de dados não abriram e as partes que dependem deles ficam desligadas: "
+        + ", ".join(dados["ilegiveis"])
+        + ". Sincronize os dados de novo."
+    )
+
 municipios = dados["municipios"].sort_values(["uf", "nome"])
 ufs = sorted(municipios["uf"].unique())
 
 
 # --------------------------------------------------------------------------- entrada
+ROTULOS = (municipios["nome"] + " (" + municipios["uf"] + ")").tolist()
+POR_ROTULO = dict(zip(ROTULOS, municipios.index, strict=True))
+
+
 def escolher_cidade(rotulo: str, padrao: tuple[str, str], chave: str) -> pd.Series:
-    uf_padrao, cidade_padrao = padrao
-    c1, c2 = st.columns([1, 3])
-    uf = c1.selectbox(
-        f"UF de {rotulo.lower()}", ufs, index=ufs.index(uf_padrao) if uf_padrao in ufs else 0,
-        key=f"uf_{chave}",
+    """Uma caixa com busca: digitar parte do nome já filtra as 5.570 cidades."""
+    uf, nome = padrao
+    inicial = f"{nome} ({uf})"
+    escolha = st.selectbox(
+        rotulo, ROTULOS, index=ROTULOS.index(inicial) if inicial in ROTULOS else 0, key=chave,
+        placeholder="Digite o nome da cidade",
     )  # fmt: skip
-    nomes = municipios.loc[municipios["uf"] == uf, "nome"].tolist()
-    indice = nomes.index(cidade_padrao) if cidade_padrao in nomes else 0
-    nome = c2.selectbox(rotulo, nomes, index=indice, key=f"cidade_{chave}")
-    return municipios[(municipios["uf"] == uf) & (municipios["nome"] == nome)].iloc[0]
+    return municipios.loc[POR_ROTULO[escolha]]
 
 
 with st.sidebar:
@@ -260,16 +281,13 @@ def mapa(v: Viagem) -> pdk.Deck:
                   stroked=True, line_width_min_pixels=1, radius_min_pixels=4, get_radius=2500,
                   pickable=True),
     ]  # fmt: skip
-    trajeto = pd.DataFrame(v.rota.trajeto, columns=["lon", "lat"])
-    extensao = max(
-        trajeto["lon"].max() - trajeto["lon"].min(), trajeto["lat"].max() - trajeto["lat"].min()
-    )
-    zoom = 7.5 if extensao < 2 else 6 if extensao < 5 else 5 if extensao < 10 else 4
+    # Enquadra a rota inteira, da origem ao destino.
+    vista = pdk.data_utils.compute_view([list(p) for p in v.rota.trajeto], view_proportion=1)
+    vista.zoom = max(3.5, vista.zoom - 0.3)
+
     return pdk.Deck(
         layers=camadas,
-        initial_view_state=pdk.ViewState(
-            longitude=float(trajeto["lon"].mean()), latitude=float(trajeto["lat"].mean()), zoom=zoom
-        ),
+        initial_view_state=vista,
         tooltip={"text": "{rotulo}"},
         map_provider="carto",
         map_style=pdk.map_styles.CARTO_LIGHT,
@@ -392,9 +410,9 @@ with aba_preco:
         if h.empty:
             st.info(f"A ANP não tem série de {TIPOS[tipo]} em {uf_sel} neste período.")
         else:
-            eixo_y = alt.Y("preco_mediano:Q", title="R$/L", scale=alt.Scale(zero=False))
+            eixo_y = alt.Y("preco_mediano:Q", axis=EIXO_REAIS, scale=alt.Scale(zero=False))
             linha = alt.Chart(h).mark_line(strokeWidth=2, color="#18211d").encode(
-                x=alt.X("semana:T", title=None), y=eixo_y,
+                x=alt.X("semana:T", axis=EIXO_DATA), y=eixo_y,
                 tooltip=[alt.Tooltip("semana:T", title="Semana", format="%d/%m/%Y"),
                          alt.Tooltip("preco_mediano:Q", title="R$/L", format=".3f")],
             )  # fmt: skip
@@ -404,6 +422,13 @@ with aba_preco:
                 p = p[p["serie"] == f"{uf_sel}|{tipo}"].copy()
             if p is not None and not p.empty:
                 p["semana_alvo"] = pd.to_datetime(p["semana_alvo"])
+                # A previsão parte do último preço observado: linha e faixa saem do mesmo ponto.
+                ancora = p.iloc[[0]].assign(
+                    semana_alvo=pd.to_datetime(p["semana_origem"].iloc[0]),
+                    previsao=p["preco_atual"].iloc[0], p10=p["preco_atual"].iloc[0],
+                    p90=p["preco_atual"].iloc[0], horizonte=0,
+                )  # fmt: skip
+                p = pd.concat([ancora, p], ignore_index=True)
                 faixa = (
                     alt.Chart(p)
                     .mark_area(opacity=0.22, color="#0e6b45")
@@ -458,7 +483,11 @@ with aba_modelo:
                 columns={"mae": "Erro médio (R$/L)", "mape": "Erro %", "cobertura": "No intervalo"}
             )
             .style.format(
-                {"Erro médio (R$/L)": "{:.3f}", "Erro %": "{:.2%}", "No intervalo": "{:.0%}"}
+                {
+                    "Erro médio (R$/L)": lambda x: numero(x, 3),
+                    "Erro %": lambda x: f"{numero(x * 100, 2)}%",
+                    "No intervalo": lambda x: f"{x:.0%}",
+                }
             ),  # fmt: skip
             width="stretch",
         )

@@ -111,3 +111,12 @@ def test_sem_dados_explica_como_sincronizar(tmp_path, monkeypatch):
     monkeypatch.setenv("ROTA_DADOS", str(tmp_path / "vazio"))
     at = AppTest.from_file(APP, default_timeout=60).run()
     assert any("sincronizar_site.py" in e.value for e in at.error)
+
+
+def test_arquivo_opcional_corrompido_nao_derruba_o_site(site, tmp_path):
+    import os
+
+    (Path(os.environ["ROTA_DADOS"]) / "modelo.json").write_bytes(bytes([0xE3]) + b" nao e json")
+    at = site.run()
+    assert not at.exception
+    assert any("modelo.json" in w.value for w in at.warning)
