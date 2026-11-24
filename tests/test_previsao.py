@@ -94,3 +94,32 @@ def test_regras_de_promocao():
     assert not avaliacao.decidir(M(0.079, 0, 0, 1), M(0.08, 0, 0, 1), ingenuo).promover  # < 2%
     d = avaliacao.decidir(M(0.07, 0, 0, 1), M(0.08, 0, 0, 1), ingenuo)
     assert d.promover and "0.0700" in d.motivo
+
+
+def test_monitor_confere_e_alerta():
+    from rota_economica.previsao import monitor
+
+    semanas = pd.date_range("2024-01-07", periods=12, freq="W-SUN")
+    s = pd.DataFrame({"serie": "SP|S10", "semana": semanas, "preco": 6.0})
+    prev = pd.DataFrame(
+        {"serie": "SP|S10", "semana_alvo": semanas, "previsao": 6.1, "p10": 5.9, "p90": 6.3}
+    )
+    futura = prev.iloc[[-1]].assign(semana_alvo=pd.Timestamp("2030-01-06"))
+    conferidas = monitor.conferir(pd.concat([prev, futura]), s)
+    assert len(conferidas) == 12  # a previsão do futuro ainda não tem preço real
+    assert conferidas["erro_abs"].round(3).eq(0.1).all() and conferidas["dentro"].all()
+    assert not monitor.avaliar(conferidas, mae_referencia=0.08).disparou  # 0,10 < 1,5 × 0,08
+    alerta = monitor.avaliar(conferidas, mae_referencia=0.05)
+    assert alerta.disparou and "passou de 1.5 vez" in alerta.mensagem
+    assert not monitor.avaliar(conferidas.iloc[0:0], 0.05).disparou
+
+
+def test_embrulho_do_modelo_devolve_reais():
+    from rota_economica.previsao.job import ModeloPyfunc
+
+    s = dados.series(_gold(semanas=60, ufs=("SP",)))
+    m = Ingenuo().treinar(dados.exemplos(s))
+    origem = dados.origem(s, s["semana"].max())
+    r = ModeloPyfunc(m).prever_em_reais(origem)
+    assert (r["previsao"] == r["preco_atual"]).all()
+    assert set(r["horizonte"]) == {1, 2, 3, 4}
