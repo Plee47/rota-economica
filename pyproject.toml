@@ -8,13 +8,14 @@ version = "0.1.0"
 description = "Rota Econômica: custo de uma viagem de caminhão e onde abastecer para gastar menos"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = ["requests>=2.31", "pandas>=2.0"]
+dependencies = ["requests>=2.31", "pandas>=2.0", "scikit-learn>=1.4"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "ruff>=0.6", "pre-commit>=3"]
 
 [project.scripts]
 rota-coleta = "rota_economica.__main__:main"
+rota-previsao = "rota_economica.previsao.job:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
