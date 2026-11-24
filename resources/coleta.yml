@@ -14,8 +14,8 @@ resources:
 
   jobs:
     coleta_semanal:
-      name: "Rota Econômica · coleta semanal"
-      # A ANP publica a semana na segunda-feira; a coleta roda na terça de manhã.
+      name: "Rota Econômica · diesel semanal"
+      # A ANP publica a semana na segunda-feira; o job roda na terça de manhã: coleta e camadas.
       schedule:
         quartz_cron_expression: "0 0 9 ? * TUE"
         timezone_id: America/Sao_Paulo
@@ -32,6 +32,18 @@ resources:
               - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
           max_retries: 2
           min_retry_interval_millis: 600000
+        - task_key: camadas
+          depends_on:
+            - task_key: coletar
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-camadas
+            parameters:
+              - "--bruto"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
+              - "--esquema"
+              - "${var.catalogo}.${resources.schemas.rota.name}"
       environments:
         - environment_key: padrao
           spec:
