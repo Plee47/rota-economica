@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from rota_economica.http import ClienteHTTP
+from rota_economica.http import ClienteHTTP, ErroHTTP
 from rota_economica.rota import municipios
 
 SEMANAS_MUNICIPIO = 8  # o site usa o preço mais recente de cada município; 8 semanas dão folga
@@ -96,9 +96,13 @@ def main(argv: list[str] | None = None) -> int:
         previsoes[previsoes["semana_origem"] == ultima].to_parquet(
             args.destino / "previsoes.parquet", index=False
         )
-    municipios.carregar(ClienteHTTP(), args.bruto / "ibge").to_parquet(
-        args.destino / "municipios.parquet", index=False
-    )
+    # O IBGE recusa pedidos vindos da nuvem (HTTP 403): vale o cache do volume, enviado de fora.
+    try:
+        municipios.carregar(ClienteHTTP(), args.bruto / "ibge").to_parquet(
+            args.destino / "municipios.parquet", index=False
+        )
+    except ErroHTTP as e:
+        log.warning("municípios do IBGE indisponíveis e sem cache no volume: %s", e)
     csv = args.bruto / "antt" / "praca-de-pedagio.csv"
     if csv.exists():
         pracas_de_pedagio(csv.read_bytes()).to_parquet(args.destino / "pracas.parquet", index=False)

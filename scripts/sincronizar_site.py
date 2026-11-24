@@ -45,6 +45,16 @@ def main() -> int:
         )  # fmt: skip
         estado = f"{(DESTINO / nome).stat().st_size} bytes" if r.returncode == 0 else "falhou"
         print(f"{nome}: {estado}")
+    if not (DESTINO / "municipios.parquet").exists():
+        # O IBGE recusa a nuvem, mas responde daqui: monta a lista localmente.
+        from rota_economica.http import ClienteHTTP
+        from rota_economica.rota import municipios
+
+        cache = RAIZ / "dados" / "cache_ibge"
+        municipios.carregar(ClienteHTTP(), cache).to_parquet(
+            DESTINO / "municipios.parquet", index=False
+        )
+        print("municipios.parquet: montado localmente pela API do IBGE")
     return 0
 
 

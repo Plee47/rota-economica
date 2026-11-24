@@ -51,6 +51,16 @@ def _pyfunc_classe():
     return Previsor
 
 
+def _parametro_codigo() -> str:
+    """`code_paths` no MLflow recente, `code_path` nas versões antigas (como a do serverless)."""
+    import inspect
+
+    import mlflow.pyfunc
+
+    parametros = inspect.signature(mlflow.pyfunc.log_model).parameters
+    return "code_paths" if "code_paths" in parametros else "code_path"
+
+
 def _backtest(s: pd.DataFrame):
     origens = list(sorted(s["semana"].unique())[-ORIGENS_BACKTEST - max(dados.HORIZONTES) : -4])
     r_ing = avaliacao.backtest(s, Ingenuo, origens)
@@ -135,7 +145,7 @@ def main(argv: list[str] | None = None) -> int:
                 registered_model_name=nome_modelo,
                 # O código do pacote vai junto do modelo: o Model Serving não instala
                 # pacotes que não estão no PyPI.
-                code_paths=[str(Path(rota_economica.__file__).parent)],
+                **{_parametro_codigo(): [str(Path(rota_economica.__file__).parent)]},
                 pip_requirements=["scikit-learn", "pandas", "numpy"],
             )
         versao = info.registered_model_version

@@ -192,3 +192,8 @@ def test_muitas_quedas_com_progresso_nao_desistem(tmp_path):
     d = c.baixar("https://x", tmp_path / "a.bin")
     assert d.caminho.read_bytes() == corpo
     assert set(esperas) <= {0}  # com progresso, sem espera crescente (intervalo 0 nos testes)
+
+
+def test_identificacao_so_em_ascii():
+    # Cabeçalho HTTP com acento ("portfólio") fazia o IBGE responder 403.
+    assert USER_AGENT.isascii()

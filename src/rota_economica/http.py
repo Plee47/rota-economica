@@ -17,7 +17,7 @@ import requests
 from rota_economica import __version__
 
 REPOSITORIO = "https://github.com/Plee47/rota-economica"
-USER_AGENT = f"rota-economica/{__version__} (projeto de portfólio; +{REPOSITORIO})"
+USER_AGENT = f"rota-economica/{__version__} (projeto de portfolio; +{REPOSITORIO})"
 PASSAGEIROS = {429, 500, 502, 503, 504}
 MAX_RETOMADAS = 1000  # teto de segurança para um download que anda muito devagar
 
