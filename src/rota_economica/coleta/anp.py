@@ -144,6 +144,13 @@ class Registro:
     bytes: int
     sha256: str
     baixado_em: str
+    # Tamanho anunciado pelo servidor e conferido. Registros antigos não têm: foram baixados antes
+    # da conferência e podem estar cortados, então são baixados de novo uma vez.
+    esperado: int | None = None
+
+    @property
+    def conferido(self) -> bool:
+        return self.esperado is not None and self.bytes == self.esperado
 
 
 @dataclass
@@ -198,12 +205,15 @@ def coletar(
     rel = Relatorio([], [], [], [])
     for a in arquivos[:limite] if limite else arquivos:
         anterior = manifesto.registros.get(a.url)
-        if anterior and not ainda_muda(a, hoje) and (destino / anterior.caminho).exists():
+        guardado = anterior and anterior.conferido and (destino / anterior.caminho).exists()
+        if guardado and not ainda_muda(a, hoje):
             rel.pulados.append(a.caminho)
             continue
         d = cliente.baixar(a.url, destino / a.caminho)
         agora = datetime.now(UTC).isoformat(timespec="seconds")
-        manifesto.registros[a.url] = Registro(a.url, a.caminho, d.bytes, d.sha256, agora)
+        manifesto.registros[a.url] = Registro(
+            a.url, a.caminho, d.bytes, d.sha256, agora, d.esperado
+        )
         if anterior is None:
             rel.novos.append(a.caminho)
         elif anterior.sha256 != d.sha256:
