@@ -152,7 +152,7 @@ def test_download_cortado_continua_de_onde_parou(tmp_path):
 def test_servidor_que_fecha_cedo_sem_erro_e_detectado(tmp_path):
     # Fim "normal" com menos bytes que o anunciado: era o defeito que cortava arquivos da ANP.
     curta = [Resposta(200, b"0123", {"Content-Length": "10"})] + [
-        Resposta(206, b"", {"Content-Range": "bytes 4-9/10"}) for _ in range(4)
+        Resposta(206, b"", {"Content-Range": "bytes 4-9/10"}) for _ in range(5)
     ]
     c = _cliente(curta)
     with pytest.raises(ErroHTTP, match="recebi 4 de 10 bytes"):
@@ -177,3 +177,18 @@ def test_tamanho_total():
     assert tamanho_total(Resposta(206, headers={"Content-Range": "bytes 4-9/10"})) == 10
     assert tamanho_total(Resposta(200, headers={"Content-Length": "7"})) == 7
     assert tamanho_total(Resposta(200)) is None
+
+
+def test_muitas_quedas_com_progresso_nao_desistem(tmp_path):
+    # O servidor entrega 2 bytes por conexão: 50 retomadas para 100 bytes, todas com progresso.
+    corpo = bytes(range(100))
+    respostas = [Resposta(200, corpo, {"Content-Length": "100"}, cai_depois=2)]
+    for inicio in range(2, 100, 2):
+        respostas.append(
+            Resposta(206, corpo[inicio:], {"Content-Range": f"bytes {inicio}-99/100"}, cai_depois=2)
+        )
+    esperas = []
+    c = _cliente(respostas, esperas)
+    d = c.baixar("https://x", tmp_path / "a.bin")
+    assert d.caminho.read_bytes() == corpo
+    assert set(esperas) <= {0}  # com progresso, sem espera crescente (intervalo 0 nos testes)

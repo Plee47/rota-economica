@@ -19,6 +19,7 @@ from rota_economica import __version__
 REPOSITORIO = "https://github.com/Plee47/rota-economica"
 USER_AGENT = f"rota-economica/{__version__} (projeto de portfólio; +{REPOSITORIO})"
 PASSAGEIROS = {429, 500, 502, 503, 504}
+MAX_RETOMADAS = 1000  # teto de segurança para um download que anda muito devagar
 
 
 class ErroHTTP(RuntimeError):
@@ -114,8 +115,13 @@ class ClienteHTTP:
         total = 0
         # identity: sem compressão no caminho, o Content-Length é o tamanho do arquivo.
         cabecalhos = {"Accept-Encoding": "identity"}
+        sem_progresso, ultimo = 0, ""
         with parcial.open("wb") as f:
-            for rodada in range(self.tentativas):
+            # Continua enquanto cada retomada trouxer bytes: a ANP derruba a conexão a cada poucos
+            # MB, e um arquivo de 120 MB precisa de dezenas de retomadas. Só tentativas seguidas
+            # sem nenhum byte novo contam para desistir.
+            for _ in range(MAX_RETOMADAS):
+                antes = total
                 pedido = {**cabecalhos, "Range": f"bytes={total}-"} if total else cabecalhos
                 try:
                     with self.get(url, stream=True, headers=pedido) as r:
@@ -133,8 +139,14 @@ class ClienteHTTP:
                     ultimo = "conexão fechada antes do fim"
                 if esperado is None or total >= esperado:
                     break
-                if rodada < self.tentativas - 1:
-                    self.dormir(espera(rodada))
+                if total > antes:
+                    sem_progresso = 0
+                    self.dormir(self.intervalo)  # andou: retoma logo, respeitando o intervalo
+                else:
+                    sem_progresso += 1
+                    if sem_progresso >= self.tentativas:
+                        break
+                    self.dormir(espera(sem_progresso - 1))
         if total == 0:
             parcial.unlink(missing_ok=True)
             raise ErroHTTP(f"{url}: arquivo vazio")
