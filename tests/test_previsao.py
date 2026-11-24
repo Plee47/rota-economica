@@ -139,3 +139,17 @@ def test_retreino_mensal_no_backtest_nao_ve_o_futuro():
     assert len(vistos) == 2  # 8 origens, retreino a cada 4
     assert vistos[0] <= origens[0] and vistos[1] <= origens[4]
     assert r["semana_origem"].nunique() == 8
+
+
+def test_variaveis_nacionais():
+    semanas = pd.date_range("2024-01-07", periods=6, freq="W-SUN")
+    linhas = []
+    for uf, precos in (("SP", [6.0, 6.0, 6.6, 6.6, 6.6, 6.6]), ("RJ", [6.2] * 6),
+                       ("MG", [5.8, 5.8, 6.38, 6.38, 6.38, 6.38])):  # fmt: skip
+        linhas += [(uf, "S10", d, p) for d, p in zip(semanas, precos, strict=True)]
+    s = dados.series(pd.DataFrame(linhas, columns=["uf", "tipo_diesel", "semana", "preco_mediano"]))
+    e = dados.exemplos(s, horizontes=(1,))
+    semana3 = e[(e["semana"] == semanas[2]) & (e["serie"] == "RJ|S10")].iloc[0]
+    # Dois de três estados subiram 10%: a mediana nacional subiu 10%; o RJ ainda não reajustou.
+    assert semana3["brasil_var_1"] == pytest.approx(0.10)
+    assert semana3["desvio_brasil"] == pytest.approx(6.2 / 6.38 - 1)

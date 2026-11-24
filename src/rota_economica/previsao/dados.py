@@ -13,6 +13,9 @@ import pandas as pd
 HORIZONTES = (1, 2, 3, 4)
 DEFASAGENS = (1, 2, 4, 8, 13, 26)  # semanas: variação desde cada uma delas
 LACUNA_MAXIMA = 2  # semanas sem coleta preenchidas com o último preço; mais que isso fica vazio
+# O que o Brasil fez nas últimas semanas: os reajustes da Petrobras chegam aos estados em semanas
+# diferentes, então a variação nacional antecipa a dos estados que ainda não reajustaram.
+NACIONAIS = ["brasil_var_1", "brasil_var_2", "brasil_var_4", "desvio_brasil"]
 FEATURES = [
     *(f"var_{k}" for k in DEFASAGENS),
     "volatilidade_8",
@@ -20,6 +23,7 @@ FEATURES = [
     "mes",
     "horizonte",
     "s10",
+    *NACIONAIS,
 ]
 
 
@@ -69,11 +73,30 @@ def exemplos(s: pd.DataFrame, horizontes=HORIZONTES) -> pd.DataFrame:
             e["horizonte"] = h
             e["alvo"] = g["preco"].shift(-h) / g["preco"] - 1
             e["preco_alvo"] = g["preco"].shift(-h)
-            e["serie"], e["semana"] = g["serie"], g["semana"]
+            e["serie"], e["semana"], e["tipo_diesel"] = g["serie"], g["semana"], g["tipo_diesel"]
             e["semana_alvo"] = g["semana"] + pd.to_timedelta(7 * h, unit="D")
             partes.append(e)
-    todos = pd.concat(partes, ignore_index=True)
-    return todos.replace([np.inf, -np.inf], np.nan)
+    todos = pd.concat(partes, ignore_index=True).merge(
+        _nacionais(s), on=["tipo_diesel", "semana"], how="left"
+    )
+    todos["desvio_brasil"] = todos["preco"] / todos.pop("preco_brasil") - 1
+    return todos.drop(columns="tipo_diesel").replace([np.inf, -np.inf], np.nan)
+
+
+def _nacionais(s: pd.DataFrame) -> pd.DataFrame:
+    """Mediana dos estados em cada semana, por tipo de diesel: só usa o que já existe na semana."""
+    s = s.sort_values("semana")
+    var1 = s.groupby("serie")["preco"].pct_change()
+    nac = (
+        s.assign(var1=var1)
+        .groupby(["tipo_diesel", "semana"])
+        .agg(preco_brasil=("preco", "median"), brasil_var_1=("var1", "median"))
+        .reset_index()
+        .sort_values("semana")
+    )
+    for k in (2, 4):
+        nac[f"brasil_var_{k}"] = nac.groupby("tipo_diesel")["preco_brasil"].pct_change(k)
+    return nac
 
 
 def origem(s: pd.DataFrame, semana: pd.Timestamp, horizontes=HORIZONTES) -> pd.DataFrame:

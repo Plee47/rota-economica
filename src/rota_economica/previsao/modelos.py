@@ -50,8 +50,11 @@ class Gradiente:
     """Um modelo por quantil, treinado em todas as séries juntas (estado e tipo de diesel)."""
 
     nome: str = "gradiente"
-    iteracoes: int = 300
-    taxa: float = 0.05
+    # Rasas e regularizadas: o preço muda em degraus, e árvores fundas aprendem ruído (no backtest
+    # real, as fundas erravam mais que a base ingênua).
+    iteracoes: int = 150
+    taxa: float = 0.03
+    profundidade: int = 3
     semente: int = 7
     _modelos: dict[str, HistGradientBoostingRegressor] = field(default_factory=dict)
 
@@ -63,7 +66,9 @@ class Gradiente:
                 quantile=q,
                 max_iter=self.iteracoes,
                 learning_rate=self.taxa,
-                min_samples_leaf=40,
+                max_depth=self.profundidade,
+                min_samples_leaf=200,
+                l2_regularization=1.0,
                 random_state=self.semente,
             )
             self._modelos[nome] = m.fit(ex[FEATURES], ex["alvo"])
