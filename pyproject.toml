@@ -17,6 +17,7 @@ dev = ["pytest>=8", "ruff>=0.6", "pre-commit>=3", "duckdb>=1.0"]
 rota-coleta = "rota_economica.__main__:main"
 rota-camadas = "rota_economica.camadas.job:main"
 rota-previsao = "rota_economica.previsao.job:main"
+rota-exportar = "rota_economica.exportacao:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

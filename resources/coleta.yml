@@ -44,6 +44,34 @@ resources:
               - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
               - "--esquema"
               - "${var.catalogo}.${resources.schemas.rota.name}"
+        - task_key: previsao
+          depends_on:
+            - task_key: camadas
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-previsao
+            parameters:
+              - "--esquema"
+              - "${var.catalogo}.${resources.schemas.rota.name}"
+              - "--exportacao"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto/exportacao"
+        - task_key: exportar
+          depends_on:
+            - task_key: previsao
+          # Exporta mesmo se o monitoramento disparar: o site mostra o alerta.
+          run_if: ALL_DONE
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-exportar
+            parameters:
+              - "--esquema"
+              - "${var.catalogo}.${resources.schemas.rota.name}"
+              - "--bruto"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
+              - "--destino"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto/exportacao"
       environments:
         - environment_key: padrao
           spec:

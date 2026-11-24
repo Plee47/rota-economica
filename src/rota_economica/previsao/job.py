@@ -7,6 +7,7 @@ está em funções puras testadas (`avaliacao`, `monitor`); aqui fica só a liga
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import pickle
 import sys
@@ -68,9 +69,29 @@ def _metricas_do_campeao(cliente, nome: str):
     return versao, m
 
 
+def resumo_do_modelo(campeao, decisao, m_ing, m_gra, horizontes, alerta, semana) -> dict:
+    """O que o site mostra sobre o modelo em produção."""
+    return {
+        "semana_dados": str(pd.Timestamp(semana).date()),
+        "campeao": campeao,
+        "decisao": {"promovido": decisao.promover, "motivo": decisao.motivo},
+        "backtest": {"ingenuo": m_ing.como_dict(), "gradiente": m_gra.como_dict()},
+        "por_horizonte": {
+            str(h): {k: float(v) for k, v in linha.items()} for h, linha in horizontes.iterrows()
+        },
+        "monitoramento": {
+            "alerta": alerta.disparou,
+            "mae_recente": alerta.mae_recente,
+            "mae_referencia": alerta.mae_referencia,
+            "mensagem": alerta.mensagem,
+        },
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="rota-previsao")
     p.add_argument("--esquema", required=True, help="catalogo.schema das tabelas e do modelo")
+    p.add_argument("--exportacao", type=Path, help="pasta onde gravar modelo.json para o site")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -125,13 +146,21 @@ def main(argv: list[str] | None = None) -> int:
         if decisao.promover:
             cliente.set_registered_model_alias(nome_modelo, APELIDO, versao)
 
-        # Previsão em lote com o campeão (que pode ser a versão anterior).
-        campeao = mlflow.pyfunc.load_model(f"models:/{nome_modelo}@{APELIDO}")
+        # Previsão em lote com o campeão (que pode ser a versão anterior). Se nenhum modelo
+        # nunca bateu a base ingênua, quem prevê é a própria base, e isso fica registrado.
         origem = dados.origem(s, s["semana"].max()).dropna(subset=["preco"])
-        previsoes = campeao.predict(origem)
-        previsoes["versao_modelo"] = cliente.get_model_version_by_alias(
-            nome_modelo, APELIDO
-        ).version
+        versao_campeao, _ = _metricas_do_campeao(cliente, nome_modelo)
+        if versao_campeao is not None:
+            campeao = mlflow.pyfunc.load_model(f"models:/{nome_modelo}@{APELIDO}")
+            previsoes = campeao.predict(origem)
+            nome_campeao = f"gradiente v{versao_campeao.version}"
+            referencia = float((versao_campeao.tags or {}).get("mae", m_gra.mae))
+        else:
+            base = Ingenuo().treinar(dados.exemplos(s))
+            previsoes = ModeloPyfunc(base).prever_em_reais(origem)
+            nome_campeao = "base ingênua"
+            referencia = m_ing.mae
+        previsoes["modelo"] = nome_campeao
         previsoes["run_id"] = run.info.run_id
         tabela = f"{args.esquema}.previsoes_diesel"
         if spark.catalog.tableExists(tabela):
@@ -142,11 +171,18 @@ def main(argv: list[str] | None = None) -> int:
         # Monitoramento: previsões antigas contra o preço real.
         todas = spark.table(tabela).toPandas()
         conferidas = monitor.conferir(todas, s)
-        versao_campeao = cliente.get_model_version_by_alias(nome_modelo, APELIDO)
-        referencia = float((versao_campeao.tags or {}).get("mae", m_gra.mae))
         alerta = monitor.avaliar(conferidas, referencia)
         mlflow.log_metric("monitor_mae_recente", alerta.mae_recente or 0.0)
         log.info("monitoramento: %s", alerta.mensagem)
+        if args.exportacao:
+            resumo = resumo_do_modelo(
+                nome_campeao, decisao, m_ing, m_gra, avaliacao.por_horizonte(r_gra),
+                alerta, origem["semana"].max(),
+            )  # fmt: skip
+            args.exportacao.mkdir(parents=True, exist_ok=True)
+            (args.exportacao / "modelo.json").write_text(
+                json.dumps(resumo, ensure_ascii=False, indent=1), encoding="utf-8"
+            )
         if alerta.disparou:
             raise RuntimeError(alerta.mensagem)
     return 0
