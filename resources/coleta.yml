@@ -50,3 +50,5 @@ resources:
             client: "2"
             dependencies:
               - ../dist/*.whl
+              # O Spark exige o PyArrow para converter tabelas do pandas.
+              - pyarrow>=14
