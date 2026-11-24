@@ -30,7 +30,11 @@ PRECO_MINIMO, PRECO_MAXIMO = 0.5, 20.0  # R$/litro: fora disso é erro de digita
 
 
 def _bytes_do_csv(caminho: Path) -> bytes:
-    if caminho.suffix.lower() != ".zip":
+    """O CSV do arquivo. O formato vem do conteúdo, não do nome: a ANP publica ZIPs com nome .csv
+    (ca-2014-01.csv é um ZIP)."""
+    with caminho.open("rb") as f:
+        e_zip = f.read(4) == b"PK\x03\x04"  # assinatura de arquivo ZIP
+    if not e_zip:
         return caminho.read_bytes()
     with zipfile.ZipFile(caminho) as z:
         csvs = [n for n in z.namelist() if n.lower().endswith(".csv")]

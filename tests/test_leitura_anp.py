@@ -56,3 +56,13 @@ def test_coluna_faltando_para_a_leitura(tmp_path):
     cabecalho = CABECALHO.replace("Valor de Venda", "Preco")
     with pytest.raises(ErroFormato, match="Valor de Venda"):
         ler_diesel(_csv(tmp_path, "x.csv", "utf-8", cabecalho=cabecalho))
+
+
+def test_zip_com_nome_de_csv(tmp_path):
+    # A ANP publica ca-2014-01.csv como um ZIP: o formato vem do conteúdo, não da extensão.
+    csv = _csv(tmp_path, "dentro.csv", "latin-1")
+    disfarcado = tmp_path / "ca-2014-01.csv"
+    with zipfile.ZipFile(disfarcado, "w", zipfile.ZIP_DEFLATED) as z:
+        z.write(csv, "Preços semestrais - AUTOMOTIVOS_2014.01.csv")
+    df = ler_diesel(disfarcado)
+    assert list(df["produto"]) == ["DIESEL S10", "DIESEL"]
