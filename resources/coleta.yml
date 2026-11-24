@@ -88,3 +88,6 @@ resources:
               # O PyArrow que já vem no ambiente foi compilado para o numpy 1: um numpy 2 trazido
               # pelas dependências impede o Spark de importar o PyArrow.
               - numpy<2
+              # O MLflow que vem no ambiente não sabe enviar o modelo ao Unity Catalog (a S3
+              # recusa o upload): o recente pede ao Databricks credenciais temporárias.
+              - mlflow-skinny[databricks]>=2.20
