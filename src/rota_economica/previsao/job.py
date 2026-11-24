@@ -109,6 +109,7 @@ def main(argv: list[str] | None = None) -> int:
 
     import mlflow
     from mlflow import MlflowClient
+    from mlflow.models import infer_signature
     from pyspark.sql import SparkSession
 
     spark = SparkSession.builder.getOrCreate()
@@ -136,12 +137,16 @@ def main(argv: list[str] | None = None) -> int:
         with tempfile.TemporaryDirectory() as tmp:
             caminho = Path(tmp) / "modelo.pkl"
             caminho.write_bytes(pickle.dumps(ModeloPyfunc(final)))
-            exemplo = dados.origem(s, s["semana"].max()).head(5)
+            exemplo = dados.origem(s, s["semana"].max()).dropna(subset=["preco"]).head(5)
+            # O Unity Catalog exige entrada e saída declaradas: a assinatura sai de uma previsão
+            # real do modelo final (o MLflow antigo não a deduz sozinho do exemplo).
+            assinatura = infer_signature(exemplo, ModeloPyfunc(final).prever_em_reais(exemplo))
             info = mlflow.pyfunc.log_model(
                 artifact_path="previsor",  # aceito pelas versões 2 e 3 do MLflow
                 python_model=_pyfunc_classe()(),
                 artifacts={"modelo": str(caminho)},
                 input_example=exemplo,
+                signature=assinatura,
                 registered_model_name=nome_modelo,
                 # O código do pacote vai junto do modelo: o Model Serving não instala
                 # pacotes que não estão no PyPI.
