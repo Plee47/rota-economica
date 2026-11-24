@@ -76,7 +76,10 @@ def main(argv: list[str] | None = None) -> int:
         if not spark.catalog.tableExists(completo):
             log.warning("%s não existe: o arquivo dela fica de fora desta exportação", completo)
             return None
-        return spark.table(completo).toPandas()
+        df = spark.table(completo).toPandas()
+        # No Spark Connect, attrs traz métricas do plano, que o Parquet não sabe gravar.
+        df.attrs.clear()
+        return df
 
     # Cada arquivo é independente: o que faltar não impede os outros (o site funciona sem eles).
     gold_municipio = tabela("gold_diesel_semanal_municipio")

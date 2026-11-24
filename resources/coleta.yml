@@ -5,6 +5,11 @@ resources:
       name: ${var.schema}
       comment: "Rota Econômica: preços de diesel, pedágios, previsões e monitoramento"
 
+  experiments:
+    previsao:
+      # Criado pelo bundle, ao lado dos arquivos dele: não depende de uma pasta compartilhada.
+      name: ${workspace.root_path}/previsao-diesel
+
   volumes:
     bruto:
       catalog_name: ${var.catalogo}
@@ -56,6 +61,8 @@ resources:
               - "${var.catalogo}.${resources.schemas.rota.name}"
               - "--exportacao"
               - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto/exportacao"
+              - "--experimento"
+              - "${resources.experiments.previsao.name}"
         - task_key: exportar
           depends_on:
             - task_key: previsao

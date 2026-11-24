@@ -22,6 +22,7 @@ from rota_economica.previsao.modelos import Gradiente, Ingenuo, em_reais
 
 log = logging.getLogger("rota-previsao")
 ORIGENS_BACKTEST = 52
+RETREINO_SEMANAS = 4  # no backtest, retreina a cada 4 semanas, como em produção
 APELIDO = "campeao"
 EXPERIMENTO = "/Shared/rota-economica/previsao-diesel"
 
@@ -53,7 +54,7 @@ def _pyfunc_classe():
 def _backtest(s: pd.DataFrame):
     origens = list(sorted(s["semana"].unique())[-ORIGENS_BACKTEST - max(dados.HORIZONTES) : -4])
     r_ing = avaliacao.backtest(s, Ingenuo, origens)
-    r_gra = avaliacao.backtest(s, Gradiente, origens)
+    r_gra = avaliacao.backtest(s, Gradiente, origens, retreinar_a_cada=RETREINO_SEMANAS)
     return r_ing, r_gra
 
 
@@ -92,6 +93,7 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(prog="rota-previsao")
     p.add_argument("--esquema", required=True, help="catalogo.schema das tabelas e do modelo")
     p.add_argument("--exportacao", type=Path, help="pasta onde gravar modelo.json para o site")
+    p.add_argument("--experimento", default=EXPERIMENTO, help="experimento do MLflow (do bundle)")
     args = p.parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -101,11 +103,12 @@ def main(argv: list[str] | None = None) -> int:
 
     spark = SparkSession.builder.getOrCreate()
     mlflow.set_registry_uri("databricks-uc")
-    mlflow.set_experiment(EXPERIMENTO)
+    mlflow.set_experiment(args.experimento)
     cliente = MlflowClient()
     nome_modelo = f"{args.esquema}.previsor_diesel"
 
     gold_uf = spark.table(f"{args.esquema}.gold_diesel_semanal_uf").toPandas()
+    gold_uf.attrs.clear()  # Spark Connect: métricas do plano em attrs
     s = dados.series(gold_uf)
     log.info("%d séries, %d semanas", s["serie"].nunique(), s["semana"].nunique())
 
@@ -125,7 +128,7 @@ def main(argv: list[str] | None = None) -> int:
             caminho.write_bytes(pickle.dumps(ModeloPyfunc(final)))
             exemplo = dados.origem(s, s["semana"].max()).head(5)
             info = mlflow.pyfunc.log_model(
-                name="previsor",
+                artifact_path="previsor",  # aceito pelas versões 2 e 3 do MLflow
                 python_model=_pyfunc_classe()(),
                 artifacts={"modelo": str(caminho)},
                 input_example=exemplo,
@@ -170,6 +173,7 @@ def main(argv: list[str] | None = None) -> int:
 
         # Monitoramento: previsões antigas contra o preço real.
         todas = spark.table(tabela).toPandas()
+        todas.attrs.clear()
         conferidas = monitor.conferir(todas, s)
         alerta = monitor.avaliar(conferidas, referencia)
         mlflow.log_metric("monitor_mae_recente", alerta.mae_recente or 0.0)

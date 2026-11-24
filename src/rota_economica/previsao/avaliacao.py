@@ -19,14 +19,22 @@ from rota_economica.previsao.modelos import em_reais
 MARGEM_PROMOCAO = 0.02  # o desafiante precisa errar pelo menos 2% menos que o campeão
 
 
-def backtest(s: pd.DataFrame, fabrica: Callable, origens: list[pd.Timestamp]) -> pd.DataFrame:
-    """Previsões em reais e o preço que de fato aconteceu, para cada origem e horizonte."""
+def backtest(
+    s: pd.DataFrame, fabrica: Callable, origens: list[pd.Timestamp], retreinar_a_cada: int = 1
+) -> pd.DataFrame:
+    """Previsões em reais e o preço que de fato aconteceu, para cada origem e horizonte.
+
+    Com `retreinar_a_cada=4`, o modelo é retreinado a cada 4 origens, como em produção (mensal), e
+    usado nas seguintes. Nunca vê o futuro: cada modelo treina só até a origem em que nasceu.
+    """
     todos = exemplos(s)
     reais = s.set_index(["serie", "semana"])["preco"]
     resultados = []
-    for o in origens:
-        treino = todos[todos["semana_alvo"] <= o]
-        modelo = fabrica().treinar(treino)
+    modelo = None
+    for i, o in enumerate(origens):
+        if modelo is None or i % retreinar_a_cada == 0:
+            treino = todos[todos["semana_alvo"] <= o]
+            modelo = fabrica().treinar(treino)
         # As features só olham para trás, então filtrar a semana dá o mesmo que recalcular com a
         # série cortada em `o` (o teste de dados confere isso), e é muito mais rápido.
         base = todos[todos["semana"] == o].drop(columns=["alvo", "preco_alvo"])

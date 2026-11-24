@@ -123,3 +123,19 @@ def test_embrulho_do_modelo_devolve_reais():
     r = ModeloPyfunc(m).prever_em_reais(origem)
     assert (r["previsao"] == r["preco_atual"]).all()
     assert set(r["horizonte"]) == {1, 2, 3, 4}
+
+
+def test_retreino_mensal_no_backtest_nao_ve_o_futuro():
+    s = dados.series(_gold(semanas=100, ufs=("SP",)))
+    origens = list(s["semana"].unique()[-12:-4])
+    vistos = []
+
+    class Espiao(Ingenuo):
+        def treinar(self, ex):
+            vistos.append(ex["semana_alvo"].max())
+            return super().treinar(ex)
+
+    r = avaliacao.backtest(s, Espiao, origens, retreinar_a_cada=4)
+    assert len(vistos) == 2  # 8 origens, retreino a cada 4
+    assert vistos[0] <= origens[0] and vistos[1] <= origens[4]
+    assert r["semana_origem"].nunique() == 8
