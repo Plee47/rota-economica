@@ -13,6 +13,10 @@ from pathlib import Path, PurePosixPath
 EXTENSOES_DADOS = {".csv", ".zip", ".xlsx", ".xls", ".parquet", ".jsonl", ".kmz"}
 PASTA_FIXTURES = "tests/fixtures/"
 LIMITE_FIXTURE = 200_000  # bytes: fixture maior que isso é dado de verdade, não exemplo
+# O site lê agregados públicos exportados pelo job (ADR 0004): só esta pasta, só estes formatos.
+PASTA_SITE = "dados/site/"
+EXTENSOES_SITE = {".parquet"}
+LIMITE_SITE = 5_000_000
 
 
 def verificar(arquivos: list[tuple[str, int]]) -> list[str]:
@@ -22,7 +26,10 @@ def verificar(arquivos: list[tuple[str, int]]) -> list[str]:
         texto = caminho.replace("\\", "/")
         if PurePosixPath(texto).suffix.lower() not in EXTENSOES_DADOS:
             continue
-        if not texto.startswith(PASTA_FIXTURES):
+        if texto.startswith(PASTA_SITE) and PurePosixPath(texto).suffix.lower() in EXTENSOES_SITE:
+            if tamanho > LIMITE_SITE:
+                violacoes.append(f"{texto}: {tamanho} bytes no site (limite {LIMITE_SITE})")
+        elif not texto.startswith(PASTA_FIXTURES):
             violacoes.append(f"{texto}: arquivo de dados fora de {PASTA_FIXTURES}")
         elif tamanho > LIMITE_FIXTURE:
             violacoes.append(f"{texto}: fixture de {tamanho} bytes (limite {LIMITE_FIXTURE})")

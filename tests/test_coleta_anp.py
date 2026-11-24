@@ -113,3 +113,18 @@ def test_manifesto_sobrevive_a_reabertura(cliente, tmp_path):
     m = anp.Manifesto.abrir(tmp_path / "anp" / "manifesto.jsonl")
     assert len(m.registros) == 3
     assert all(len(r.sha256) == 64 for r in m.registros.values())
+
+
+def test_registro_antigo_sem_conferencia_e_baixado_de_novo(cliente, tmp_path):
+    hoje = date(2026, 11, 24)
+    anp.coletar(cliente, tmp_path, hoje=hoje)
+    caminho = tmp_path / "anp" / "manifesto.jsonl"
+    # Simula o manifesto da primeira coleta, feita antes da conferência de tamanho.
+    m = anp.Manifesto.abrir(caminho)
+    for r in m.registros.values():
+        r.esperado = None
+    m.gravar()
+    rel = anp.coletar(cliente, tmp_path, hoje=hoje)
+    assert not rel.pulados  # nada antigo é confiado sem conferência
+    rel = anp.coletar(cliente, tmp_path, hoje=hoje)
+    assert rel.pulados  # depois de conferidos, voltam a ser pulados

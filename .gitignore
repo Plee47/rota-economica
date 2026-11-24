@@ -9,5 +9,6 @@ dist/
 .databricks/
 .env
 # Dados brutos ficam no volume do Databricks, nunca no Git (ver ADR 0003).
-dados/
+dados/*
+!dados/site/
 *.parcial

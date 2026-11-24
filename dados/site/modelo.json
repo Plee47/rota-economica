@@ -1,0 +1,54 @@
+{
+ "semana_dados": "2026-11-15",
+ "campeao": "gradiente v3",
+ "decisao": {
+  "promovido": true,
+  "motivo": "primeiro modelo, e bate a base ingênua"
+ },
+ "backtest": {
+  "ingenuo": {
+   "mae": 0.14893831286127168,
+   "mape": 0.020775099846271124,
+   "cobertura": 0.6818099710982659,
+   "previsoes": 11072
+  },
+  "gradiente": {
+   "mae": 0.1457975844344194,
+   "mape": 0.020315196406860657,
+   "cobertura": 0.8041004335260116,
+   "previsoes": 11072
+  }
+ },
+ "por_horizonte": {
+  "1": {
+   "mae": 0.07792447648441345,
+   "mape": 0.011011790542077874,
+   "cobertura": 0.8643089137495489,
+   "previsoes": 2771.0
+  },
+  "2": {
+   "mae": 0.12499559551189404,
+   "mape": 0.017491377053669967,
+   "cobertura": 0.8128612716763006,
+   "previsoes": 2768.0
+  },
+  "3": {
+   "mae": 0.1697028917913367,
+   "mape": 0.023594273470232498,
+   "cobertura": 0.7896638959161547,
+   "previsoes": 2767.0
+  },
+  "4": {
+   "mae": 0.21069646440926623,
+   "mape": 0.029181018310908035,
+   "cobertura": 0.7494577006507592,
+   "previsoes": 2766.0
+  }
+ },
+ "monitoramento": {
+  "alerta": false,
+  "mae_recente": null,
+  "mae_referencia": 0.1457975844344194,
+  "mensagem": "ainda não há previsões com o preço real"
+ }
+}

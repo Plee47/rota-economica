@@ -1,0 +1,116 @@
+/* Rota Econômica: a camada fina sobre o tema do Streamlit (.streamlit/config.toml).
+   Só o que o tema não alcança: superfícies do navegador, a nota da viagem, as paradas e o
+   movimento das interações. As cores repetem as do tema. */
+:root {
+  --asfalto: #18211d;
+  --asfalto-2: #3f4b46;
+  --papel: #f3f5f4;
+  --superficie: #ffffff;
+  --linha: #c9d2cd;
+  --rodovia: #0e6b45;
+  --rodovia-fundo: #dcefe5;
+  --sinal: #e3a21a;
+  --sinal-fundo: #fcf0cf;
+  --alta: #b42318;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/* ---------------------------------------------------------------- superfícies do navegador */
+::selection { background: var(--rodovia); color: #fff; }
+html { scrollbar-color: var(--linha) transparent; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--linha); border-radius: 999px; border: 2px solid var(--papel); }
+:focus-visible { outline: 2px solid var(--rodovia); outline-offset: 2px; }
+a { text-underline-offset: 0.2em; }
+[data-testid="stMetricValue"], .nota dd, .paradas, .esperar { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- botões: respondem ao toque */
+.stButton button, .stFormSubmitButton button {
+  transition: transform 140ms var(--ease-out), background-color 160ms ease, box-shadow 160ms ease;
+  font-weight: 600;
+}
+.stButton button:active, .stFormSubmitButton button:active { transform: scale(0.97); }
+@media (hover: hover) and (pointer: fine) {
+  .stButton button[kind="primary"]:hover { box-shadow: 0 2px 8px rgb(14 107 69 / 0.25); }
+}
+
+/* ---------------------------------------------------------------- cabeçalho */
+.marca { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin: 0 0 0.25rem; }
+.marca .nome {
+  font-family: "Barlow Semi Condensed", "Barlow", sans-serif; font-weight: 700; font-size: 2.1rem;
+  line-height: 1; color: var(--asfalto); letter-spacing: -0.01em;
+}
+.marca .placa {
+  font-family: "Barlow Semi Condensed", "Barlow", sans-serif; font-weight: 600; font-size: 0.85rem;
+  background: var(--rodovia); color: #fff; padding: 0.15rem 0.5rem; border-radius: 0.25rem;
+  border: 2px solid #fff; box-shadow: 0 0 0 1px var(--rodovia);
+}
+.lema { color: var(--asfalto-2); max-width: 68ch; margin: 0 0 1rem; }
+
+/* ---------------------------------------------------------------- nota da viagem */
+.nota {
+  background: var(--superficie); border: 1px solid var(--linha); border-radius: 0.5rem;
+  padding: 1.1rem 1.25rem 1rem; box-shadow: 0 1px 2px rgb(24 33 29 / 0.06), 0 6px 18px rgb(24 33 29 / 0.05);
+}
+.nota .trecho {
+  font-family: "Barlow Semi Condensed", "Barlow", sans-serif; font-weight: 600; font-size: 1.35rem;
+  line-height: 1.2; margin: 0 0 0.75rem; text-wrap: balance;
+}
+.nota .trecho span { color: var(--asfalto-2); font-weight: 500; }
+.nota dl { margin: 0; display: grid; gap: 0; }
+.nota dl > div {
+  display: flex; justify-content: space-between; gap: 1rem; align-items: baseline;
+  padding: 0.45rem 0; border-bottom: 1px dashed var(--linha);
+}
+.nota dt { color: var(--asfalto-2); }
+.nota dt small { display: block; font-size: 0.8rem; color: var(--asfalto-2); opacity: 0.85; }
+.nota dd { margin: 0; font-weight: 600; text-align: right; white-space: nowrap; }
+.nota .total { border-bottom: 0; padding-top: 0.65rem; }
+.nota .total dt, .nota .total dd { color: var(--asfalto); font-size: 1.25rem; font-weight: 700; }
+.economia {
+  margin: 0.9rem 0 0; padding: 0.75rem 0.9rem; border-radius: 0.375rem;
+  background: var(--rodovia-fundo); color: #0b5536; line-height: 1.45;
+}
+.economia strong { font-size: 1.15rem; }
+
+/* ---------------------------------------------------------------- paradas */
+.paradas { list-style: none; margin: 0.25rem 0 0; padding: 0; }
+.paradas li {
+  display: grid; grid-template-columns: 4.6rem 1fr auto; gap: 0.25rem 0.9rem; align-items: center;
+  padding: 0.7rem 0; border-bottom: 1px solid var(--linha);
+}
+.paradas li:last-child { border-bottom: 0; }
+.paradas .km {
+  font-family: "Barlow Semi Condensed", "Barlow", sans-serif; font-weight: 700; font-size: 0.9rem;
+  text-align: center; background: var(--sinal); color: var(--asfalto); border-radius: 0.25rem;
+  padding: 0.2rem 0.3rem; line-height: 1.1;
+}
+.paradas .km small { display: block; font-weight: 600; font-size: 0.7rem; }
+.paradas .cidade { font-weight: 600; }
+.paradas .detalhe { color: var(--asfalto-2); font-size: 0.9rem; }
+.paradas .valor { font-weight: 700; text-align: right; white-space: nowrap; }
+.paradas .valor small { display: block; font-weight: 500; color: var(--asfalto-2); font-size: 0.85rem; }
+
+/* ---------------------------------------------------------------- vale esperar? */
+.esperar { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.25rem 0 0.5rem; }
+.esperar span {
+  border: 1px solid var(--linha); background: var(--superficie); border-radius: 999px;
+  padding: 0.3rem 0.75rem; font-size: 0.95rem;
+}
+.esperar b { margin-right: 0.35rem; }
+.esperar .sobe { color: var(--alta); }
+.esperar .cai { color: var(--rodovia); }
+
+/* ---------------------------------------------------------------- legenda do mapa */
+.legenda { display: flex; flex-wrap: wrap; gap: 0.4rem 1.1rem; color: var(--asfalto-2); font-size: 0.85rem; margin-top: 0.4rem; }
+.legenda i { display: inline-block; width: 0.75rem; height: 0.75rem; border-radius: 999px; margin-right: 0.35rem; vertical-align: -0.05rem; }
+.legenda .faixa { width: 4.5rem; border-radius: 999px; background: linear-gradient(90deg, #1c7c74, #9aa39f, #c2410c); }
+
+/* ---------------------------------------------------------------- vazio */
+.vazio { border: 1px dashed var(--linha); border-radius: 0.5rem; padding: 1.25rem; background: var(--superficie); max-width: 68ch; }
+.vazio p { margin: 0 0 0.5rem; }
+
+@media (prefers-reduced-motion: reduce) {
+  .stButton button, .stFormSubmitButton button { transition: none; }
+  .stButton button:active, .stFormSubmitButton button:active { transform: none; }
+}

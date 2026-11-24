@@ -5,6 +5,11 @@ resources:
       name: ${var.schema}
       comment: "Rota Econômica: preços de diesel, pedágios, previsões e monitoramento"
 
+  experiments:
+    previsao:
+      # Criado pelo bundle, ao lado dos arquivos dele: não depende de uma pasta compartilhada.
+      name: ${workspace.root_path}/previsao-diesel
+
   volumes:
     bruto:
       catalog_name: ${var.catalogo}
@@ -14,8 +19,8 @@ resources:
 
   jobs:
     coleta_semanal:
-      name: "Rota Econômica · coleta semanal"
-      # A ANP publica a semana na segunda-feira; a coleta roda na terça de manhã.
+      name: "Rota Econômica · diesel semanal"
+      # A ANP publica a semana na segunda-feira; o job roda na terça de manhã: coleta e camadas.
       schedule:
         quartz_cron_expression: "0 0 9 ? * TUE"
         timezone_id: America/Sao_Paulo
@@ -32,9 +37,57 @@ resources:
               - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
           max_retries: 2
           min_retry_interval_millis: 600000
+        - task_key: camadas
+          depends_on:
+            - task_key: coletar
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-camadas
+            parameters:
+              - "--bruto"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
+              - "--esquema"
+              - "${var.catalogo}.${resources.schemas.rota.name}"
+        - task_key: previsao
+          depends_on:
+            - task_key: camadas
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-previsao
+            parameters:
+              - "--esquema"
+              - "${var.catalogo}.${resources.schemas.rota.name}"
+              - "--exportacao"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto/exportacao"
+              - "--experimento"
+              - "${resources.experiments.previsao.name}"
+        - task_key: exportar
+          depends_on:
+            - task_key: previsao
+          # Exporta mesmo se o monitoramento disparar: o site mostra o alerta.
+          run_if: ALL_DONE
+          environment_key: padrao
+          python_wheel_task:
+            package_name: rota_economica
+            entry_point: rota-exportar
+            parameters:
+              - "--esquema"
+              - "${var.catalogo}.${resources.schemas.rota.name}"
+              - "--bruto"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto"
+              - "--destino"
+              - "/Volumes/${var.catalogo}/${resources.schemas.rota.name}/bruto/exportacao"
       environments:
         - environment_key: padrao
           spec:
             client: "2"
             dependencies:
               - ../dist/*.whl
+              # O PyArrow que já vem no ambiente foi compilado para o numpy 1: um numpy 2 trazido
+              # pelas dependências impede o Spark de importar o PyArrow.
+              - numpy<2
+              # O MLflow que vem no ambiente não sabe enviar o modelo ao Unity Catalog (a S3
+              # recusa o upload): o recente pede ao Databricks credenciais temporárias.
+              - mlflow-skinny[databricks]>=2.20
